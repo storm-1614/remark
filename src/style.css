@@ -75,7 +75,7 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--nord10);
   background: var(--nord6);
 }
 .brand { display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 750; letter-spacing: -.06em; }
-.brand-dot, .present-brand span { color: var(--nord10); }
+.brand-dot, .present-credit span { color: var(--nord10); }
 .brand-mark { width: 23px; height: 23px; border: 6px solid var(--nord10); border-radius: 7px 7px 7px 2px; transform: rotate(-12deg); }
 .topbar-center { color: var(--nord3); font-size: 13px; letter-spacing: .08em; margin-left: 90px; }
 .topbar-actions { display: flex; align-items: center; gap: 22px; }
@@ -210,9 +210,13 @@ body.speaker-receiver .present-toolbar { display: none !important; }
 body.presenting { overflow: hidden; }
 body.presenting .preview-stage { position: fixed; z-index: 20; inset: 0; width: 100vw; height: 100dvh; padding: 0; border: 0; border-radius: 0; background: var(--nord6); }
 body.presenting .preview-frame { width: 100%; height: 100%; aspect-ratio: auto; box-shadow: none; }
-body.presenting .present-toolbar { display: flex; position: absolute; left: 26px; right: 26px; bottom: 19px; justify-content: space-between; align-items: center; color: var(--nord3); opacity: 0; transition: opacity .2s; pointer-events: none; }
+body.presenting .present-toolbar { display: flex; position: absolute; right: 26px; bottom: 49px; justify-content: flex-end; align-items: center; color: var(--nord3); opacity: 0; transition: opacity .2s; pointer-events: none; }
 body.presenting .preview-stage:hover .present-toolbar, body.presenting .present-toolbar:focus-within { opacity: 1; pointer-events: auto; }
-.present-brand { font-size: 14px; font-weight: 750; letter-spacing: -.05em; }
+.present-brand, .present-credit { position: absolute; z-index: 3; bottom: 10px; color: var(--nord3); font-size: 10px; font-weight: 750; letter-spacing: -.05em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+.present-brand { left: 14px; max-width: calc(100% - 100px); }
+.present-credit { right: 14px; }
+body.presenting .present-brand { left: 26px; bottom: 19px; font-size: 14px; }
+body.presenting .present-credit { right: 26px; bottom: 19px; font-size: 14px; }
 .present-toolbar button { padding: 7px 10px; border: 1px solid var(--nord4); border-radius: 6px; color: var(--nord10); background: var(--nord6); font-size: 12px; }
 
 @media (max-width: 1050px) {

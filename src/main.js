@@ -28,6 +28,7 @@ import { mathExtension } from './math.js';
 import { renderSteppedMarkdown } from './steps.js';
 import { extractSpeakerNotes } from './notes.js';
 import { getSpeakerOptions } from './speaker.js';
+import { parseDeckMetadata } from './deck.js';
 import 'reveal.js/reveal.css';
 import 'katex/dist/katex.min.css';
 import './style.css';
@@ -42,6 +43,7 @@ const editorCount = document.querySelector('#editor-count');
 const saveStatus = document.querySelector('#save-status');
 const prevButton = document.querySelector('#prev-button');
 const nextButton = document.querySelector('#next-button');
+const presentBrand = document.querySelector('.present-brand');
 const cliParams = new URLSearchParams(location.search);
 const speakerOptions = getSpeakerOptions(cliParams);
 const isSpeakerReceiver = speakerOptions.receiver;
@@ -301,7 +303,10 @@ async function renderVisuals(version) {
 
 function renderSlides() {
   const currentIndex = deck.isReady() ? deck.getIndices().h : 0;
-  const pages = splitSlides(editor.value);
+  const metadata = parseDeckMetadata(editor.value);
+  const pages = splitSlides(metadata.content);
+  presentBrand.textContent = metadata.brand || '';
+  presentBrand.hidden = !metadata.brand;
   const version = ++renderVersion;
   for (const chart of chartInstances.splice(0)) chart.destroy();
   slideContainer.replaceChildren();
