@@ -10,12 +10,14 @@ import { createPreviewServer, parseCliArgs } from './cli-core.mjs';
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const usage = `用法：
   remark-ppt import  文件.md [--no-open] [--json] [--port 端口]
+  remark-ppt preview 文件.md [--no-open] [--json] [--port 端口]
   remark-ppt present 文件.md [--no-open] [--json] [--port 端口]
 
 import  在编辑器中打开 Markdown；网页中的修改不会写回源文件。
+preview 只读预览本地 Markdown；在 Vim 中保存后自动刷新。
 present 直接放映，并在源文件保存后自动刷新。
 --no-open 不自动打开浏览器；--json 只向标准输出写入启动信息。
---port 0 由系统选择空闲端口（默认）。按 Ctrl+C 停止服务。`;
+默认端口为 5175；--port 0 可由系统选择空闲端口。按 Ctrl+C 停止服务。`;
 
 function openBrowser(url) {
   const platform = process.platform;
@@ -47,7 +49,7 @@ async function main() {
     distDir: resolve(projectRoot, 'dist'),
     token,
     port: options.port,
-    watch: options.command === 'present',
+    watch: options.command === 'preview' || options.command === 'present',
   });
   const url = new URL(`http://127.0.0.1:${preview.port}/`);
   url.searchParams.set('cli', '1');
@@ -74,6 +76,8 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`remark-ppt：${error.message}`);
+  console.error(error.code === 'EADDRINUSE'
+    ? 'remark-ppt：端口已被占用，请先停止原有预览服务，或使用 --port 指定其他端口。'
+    : `remark-ppt：${error.message}`);
   process.exitCode = 1;
 });

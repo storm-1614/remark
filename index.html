@@ -15,10 +15,11 @@
         </div>
         <div class="topbar-center">让内容站在前面</div>
         <div class="topbar-actions">
+          <button class="text-button theme-button" id="theme-button" type="button" aria-label="切换深浅主题">深色</button>
           <button class="text-button" id="open-button" type="button">打开 Markdown</button>
           <button class="text-button" id="download-button" type="button">下载</button>
           <button class="primary-button" id="present-button" type="button">
-            <span class="play-icon" aria-hidden="true">▶</span> 开始放映 <kbd>F</kbd>
+            <span class="play-icon" aria-hidden="true">▶</span> 开始放映 <kbd>S</kbd>
           </button>
         </div>
       </header>
@@ -35,12 +36,15 @@
           <div class="editor-shell">
             <div class="editor-toolbar">
               <span class="editor-tab"><span class="file-icon">#</span> <span id="file-name-tab">slides.md</span></span>
-              <span class="toolbar-note">用 <code>---</code> 新建一页</span>
+              <div class="editor-toolbar-actions">
+                <span class="toolbar-note">用 <code>---</code> 新建一页</span>
+                <button class="vim-toggle" id="vim-button" type="button" aria-pressed="true">Vim 开</button>
+              </div>
             </div>
             <textarea id="editor" spellcheck="false" aria-label="幻灯片 Markdown 内容"></textarea>
             <div class="editor-footer">
               <span id="editor-count">0 行 · 0 字</span>
-              <span>自动保存在本机浏览器</span>
+              <span><strong class="vim-mode" id="vim-mode">NORMAL</strong> · 自动保存在本机浏览器</span>
             </div>
           </div>
           <div class="editor-tip"><span class="tip-spark">✳</span> 专注内容。标题、列表、图片和代码会自然排版。</div>
@@ -73,7 +77,7 @@
               <span id="page-count">01 / 01</span>
               <button id="next-button" type="button" aria-label="下一页">→</button>
             </div>
-            <span class="shortcut-hint">方向键翻页 · F 放映 · Esc 退出</span>
+            <span class="shortcut-hint">S 放映 · F 全屏 · P 演讲者视图 · O 总览 · ? 帮助</span>
           </div>
         </section>
       </main>

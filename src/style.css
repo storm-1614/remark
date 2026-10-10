@@ -25,6 +25,11 @@
   --nord8: #88c0d0;
   --nord9: #81a1c1;
   --nord10: #5e81ac;
+  --text-red: #9f3f4b;
+  --text-blue: #3d6391;
+  --text-green: #4d7240;
+  --text-yellow: #82651a;
+  --text-purple: #725089;
   font-family: "JetBrainsMono Nerd Font", "Source Han Sans CN", sans-serif;
   color: var(--nord0);
   background: var(--nord6);
@@ -33,9 +38,28 @@
   -webkit-font-smoothing: antialiased;
 }
 
+:root[data-theme="dark"] {
+  --nord0: #eceff4;
+  --nord1: #e5e9f0;
+  --nord2: #d8dee9;
+  --nord3: #aeb8c8;
+  --nord4: #4c566a;
+  --nord5: #3b4252;
+  --nord6: #2e3440;
+  --nord8: #88c0d0;
+  --nord9: #81a1c1;
+  --nord10: #88c0d0;
+  --text-red: #ff818b;
+  --text-blue: #88c0d0;
+  --text-green: #a3be8c;
+  --text-yellow: #ebcb8b;
+  --text-purple: #c6a0cf;
+  color-scheme: dark;
+}
+
 * { box-sizing: border-box; }
 
-body, body.reveal-viewport { margin: 0; min-width: 320px; background: var(--nord6); }
+body, body.reveal-viewport { margin: 0; min-width: 320px; color: var(--nord0); background: var(--nord6); }
 button, textarea { font: inherit; }
 button { cursor: pointer; }
 button:focus-visible, textarea:focus-visible { outline: 2px solid var(--nord10); outline-offset: 3px; }
@@ -57,6 +81,7 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--nord10);
 .topbar-actions { display: flex; align-items: center; gap: 22px; }
 .text-button { color: var(--nord3); background: none; border: 0; padding: 9px 0; font-size: 13px; }
 .text-button:hover { color: var(--nord10); }
+.theme-button { min-width: 92px; }
 .primary-button { background: var(--nord10); color: var(--nord6); border: 1px solid var(--nord10); border-radius: 8px; padding: 11px 14px; font-size: 13px; font-weight: 650; box-shadow: 0 3px 7px #2e34401b; }
 .primary-button:hover { background: var(--nord3); }
 .play-icon { font-size: 9px; margin-right: 6px; }
@@ -74,6 +99,11 @@ kbd { font-family: inherit; font-size: 11px; border: 1px solid currentColor; bor
 .file-icon { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; background: var(--nord4); color: var(--nord10); font-weight: 750; }
 .toolbar-note { color: var(--nord3); }
 .toolbar-note code { color: var(--nord10); background: var(--nord4); padding: 2px 4px; border-radius: 3px; }
+.editor-toolbar-actions { display: flex; align-items: center; gap: 14px; }
+.vim-toggle { padding: 4px 8px; border: 1px solid var(--nord4); border-radius: 5px; color: var(--nord10); background: var(--nord6); font-size: 11px; white-space: nowrap; }
+.vim-toggle:hover { border-color: var(--nord10); }
+.vim-mode { color: var(--nord10); font-weight: 750; letter-spacing: .04em; }
+#editor[data-vim-mode="normal"] { caret-color: var(--nord10); }
 #editor { display: block; width: 100%; min-height: min(58vh, 640px); padding: 25px 28px; resize: vertical; border: 0; outline: none; color: var(--nord0); background: var(--nord6); font-family: "JetBrainsMono Nerd Font", "Source Han Sans CN", monospace; font-size: 14px; line-height: 1.9; tab-size: 2; }
 #editor:focus-visible { outline: none; }
 .editor-footer { display: flex; justify-content: space-between; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--nord4); color: var(--nord3); font-size: 11px; }
@@ -94,6 +124,8 @@ kbd { font-family: inherit; font-size: 11px; border: 1px solid currentColor; bor
 /* 讲述页只设置一套稳定的文字层级，内容越少，留白越充分。 */
 .reveal { color: var(--nord0); background: var(--nord6); font-family: inherit; font-size: 34px; }
 .reveal .slides { text-align: left; }
+.reveal aside.notes { display: none !important; }
+body.speaker-receiver .present-toolbar { display: none !important; }
 .reveal .slides section.content-slide { height: 100%; padding: 74px 86px; overflow: hidden; }
 .reveal .slides section.content-slide > :first-child { margin-top: 0; }
 .reveal h1, .reveal h2, .reveal h3 { color: var(--nord0); font-family: inherit; text-transform: none; letter-spacing: -.045em; text-shadow: none; font-weight: 730; }
@@ -102,6 +134,11 @@ kbd { font-family: inherit; font-size: 11px; border: 1px solid currentColor; bor
 .reveal h3 { font-size: .83em; line-height: 1.4; color: var(--nord10); margin: 0 0 .8em; font-weight: 650; }
 .reveal p { line-height: 1.58; margin: .5em 0; }
 .reveal strong { color: var(--nord10); font-weight: 750; }
+.reveal .text-red, .reveal .text-red strong { color: var(--text-red); }
+.reveal .text-blue, .reveal .text-blue strong { color: var(--text-blue); }
+.reveal .text-green, .reveal .text-green strong { color: var(--text-green); }
+.reveal .text-yellow, .reveal .text-yellow strong { color: var(--text-yellow); }
+.reveal .text-purple, .reveal .text-purple strong { color: var(--text-purple); }
 .reveal ul, .reveal ol { display: block; margin: .65em 0 .65em 1.1em; line-height: 1.6; }
 .reveal li { padding-left: .22em; margin: .18em 0; }
 .reveal li::marker { color: var(--nord10); }
@@ -114,13 +151,23 @@ kbd { font-family: inherit; font-size: 11px; border: 1px solid currentColor; bor
 .reveal pre code .hljs-title,
 .reveal pre code .hljs-function,
 .reveal pre code .hljs-type,
-.reveal pre code .hljs-class { color: #6d5b91; }
+.reveal pre code .hljs-class { color: #b48ead; }
 .reveal pre code .hljs-string,
 .reveal pre code .hljs-attr,
-.reveal pre code .hljs-template-variable { color: #547247; }
+.reveal pre code .hljs-template-variable { color: #a3be8c; }
 .reveal pre code .hljs-number,
 .reveal pre code .hljs-literal,
-.reveal pre code .hljs-symbol { color: #9a5d4c; }
+.reveal pre code .hljs-symbol { color: #d08770; }
+:root:not([data-theme="dark"]) .reveal pre code .hljs-title,
+:root:not([data-theme="dark"]) .reveal pre code .hljs-function,
+:root:not([data-theme="dark"]) .reveal pre code .hljs-type,
+:root:not([data-theme="dark"]) .reveal pre code .hljs-class { color: #6d5b91; }
+:root:not([data-theme="dark"]) .reveal pre code .hljs-string,
+:root:not([data-theme="dark"]) .reveal pre code .hljs-attr,
+:root:not([data-theme="dark"]) .reveal pre code .hljs-template-variable { color: #547247; }
+:root:not([data-theme="dark"]) .reveal pre code .hljs-number,
+:root:not([data-theme="dark"]) .reveal pre code .hljs-literal,
+:root:not([data-theme="dark"]) .reveal pre code .hljs-symbol { color: #9a5d4c; }
 .reveal pre code .hljs-comment,
 .reveal pre code .hljs-quote { color: var(--nord3); font-style: italic; }
 .reveal pre code .hljs-meta,
@@ -158,6 +205,7 @@ kbd { font-family: inherit; font-size: 11px; border: 1px solid currentColor; bor
 .visual-chart canvas { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
 .visual-diagram svg { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; }
 .visual-error { display: flex; align-items: center; justify-content: center; padding: 28px; border: 1px dashed #bf616a; border-radius: 10px; color: #8f3f48; background: #f8eeee; font-size: .62em; line-height: 1.5; }
+:root[data-theme="dark"] .visual-error { color: #ffb2b9; background: #4b3540; }
 
 body.presenting { overflow: hidden; }
 body.presenting .preview-stage { position: fixed; z-index: 20; inset: 0; width: 100vw; height: 100dvh; padding: 0; border: 0; border-radius: 0; background: var(--nord6); }
@@ -177,6 +225,7 @@ body.presenting .preview-stage:hover .present-toolbar, body.presenting .present-
   .brand { font-size: 20px; }
   .topbar-actions { gap: 10px; }
   .text-button { font-size: 11px; }
+  .theme-button { min-width: 0; }
   .primary-button { padding: 9px; font-size: 0; }
   .primary-button .play-icon { font-size: 12px; margin: 0; }
   .primary-button kbd { display: none; }

@@ -1,4 +1,5 @@
 import Reveal from 'reveal.js';
+import RevealNotes from 'reveal.js/plugin/notes';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
@@ -19,7 +20,16 @@ import DOMPurify from 'dompurify';
 import example from './example.md?raw';
 import { splitSlides } from './slides.js';
 import { parseChartSpec, parseSlideStructure } from './visuals.js';
+import { getKeyboardAction } from './keyboard.js';
+import { chooseTheme } from './theme.js';
+import { createVimEditor } from './vim.js';
+import { colorExtension } from './colors.js';
+import { mathExtension } from './math.js';
+import { renderSteppedMarkdown } from './steps.js';
+import { extractSpeakerNotes } from './notes.js';
+import { getSpeakerOptions } from './speaker.js';
 import 'reveal.js/reveal.css';
+import 'katex/dist/katex.min.css';
 import './style.css';
 
 const STORAGE_KEY = 'remark-ppt:slides:v1';
@@ -33,35 +43,40 @@ const saveStatus = document.querySelector('#save-status');
 const prevButton = document.querySelector('#prev-button');
 const nextButton = document.querySelector('#next-button');
 const cliParams = new URLSearchParams(location.search);
+const speakerOptions = getSpeakerOptions(cliParams);
+const isSpeakerReceiver = speakerOptions.receiver;
+if (isSpeakerReceiver) document.body.classList.add('speaker-receiver');
 const cliMode = cliParams.get('cli') === '1' ? cliParams.get('mode') : null;
 const cliToken = cliParams.get('token');
 const cliFileName = cliParams.get('name') || 'slides.md';
 const draftKey = cliMode === 'import' ? `${STORAGE_KEY}:import:${cliToken}` : STORAGE_KEY;
+const themeKey = 'remark-ppt:theme:v1';
+const themeButton = document.querySelector('#theme-button');
+let storedTheme;
+try { storedTheme = localStorage.getItem(themeKey); } catch { /* 私密模式仍可切换主题 */ }
+let currentTheme = chooseTheme(storedTheme, matchMedia('(prefers-color-scheme: dark)').matches);
+function applyTheme(theme) {
+  currentTheme = theme;
+  document.documentElement.dataset.theme = theme;
+  document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#2e3440' : '#eceff4';
+  themeButton.textContent = theme === 'dark' ? '浅色' : '深色';
+  themeButton.setAttribute('aria-label', `切换到${theme === 'dark' ? '浅色' : '深色'}主题`);
+}
+applyTheme(currentTheme);
 
 marked.setOptions({ gfm: true, breaks: false });
+marked.use(colorExtension);
+marked.use(mathExtension);
 let mermaidPromise;
 let chartPromise;
 function getMermaid() {
-  mermaidPromise ??= import('mermaid').then(({ default: mermaid }) => {
-    mermaid.initialize({
-      startOnLoad: false,
-      securityLevel: 'strict',
-      htmlLabels: false,
-      theme: 'base',
-      themeVariables: {
-        background: '#eceff4',
-        primaryColor: '#e5e9f0',
-        primaryTextColor: '#2e3440',
-        primaryBorderColor: '#5e81ac',
-        lineColor: '#5e81ac',
-        secondaryColor: '#d8dee9',
-        tertiaryColor: '#eceff4',
-        fontFamily: 'Source Han Sans CN, sans-serif',
-      },
-    });
-    return mermaid;
-  });
+  mermaidPromise ??= import('mermaid').then(({ default: mermaid }) => mermaid);
   return mermaidPromise;
+}
+function themeColors() {
+  const style = getComputedStyle(document.documentElement);
+  return Object.fromEntries(['nord0', 'nord2', 'nord3', 'nord4', 'nord5', 'nord6', 'nord10']
+    .map(name => [name, style.getPropertyValue(`--${name}`).trim()]));
 }
 function getChart() {
   chartPromise ??= import('chart.js/auto').then(({ default: Chart }) => Chart);
@@ -78,12 +93,12 @@ async function loadCliDeck() {
 }
 
 let initialContent = example;
-if (cliMode === 'import' || cliMode === 'present') {
+if (cliMode === 'import' || cliMode === 'preview' || cliMode === 'present') {
   document.querySelector('#file-name-top').textContent = cliFileName;
   document.querySelector('#file-name-tab').textContent = cliFileName;
   try {
     initialContent = await loadCliDeck();
-    saveStatus.textContent = cliMode === 'present' ? '来自文件' : '已导入';
+    saveStatus.textContent = cliMode === 'preview' || cliMode === 'present' ? '本地文件' : '已导入';
     if (cliMode === 'import') {
       try {
         const draft = localStorage.getItem(draftKey);
@@ -105,7 +120,29 @@ if (cliMode === 'import' || cliMode === 'present') {
   }
 }
 editor.value = initialContent;
-if (cliMode === 'present') {
+const vimButton = document.querySelector('#vim-button');
+const vimModeLabel = document.querySelector('#vim-mode');
+let vimEnabled = true;
+try { vimEnabled = localStorage.getItem('remark-ppt:vim:v1') !== 'off'; } catch { /* 继续使用 Vim 模式 */ }
+const vim = createVimEditor(editor, updateVimStatus);
+function updateVimStatus() {
+  vimButton.textContent = vimEnabled ? 'Vim 开' : 'Vim 关';
+  vimButton.setAttribute('aria-pressed', String(vimEnabled));
+  vimModeLabel.textContent = vimEnabled ? vim.mode.toUpperCase() : '普通编辑';
+  editor.dataset.vimMode = vimEnabled ? vim.mode : 'off';
+}
+updateVimStatus();
+editor.addEventListener('keydown', event => {
+  if (vimEnabled) vim.handleKey(event);
+});
+vimButton.addEventListener('click', () => {
+  vimEnabled = !vimEnabled;
+  vim.reset();
+  try { localStorage.setItem('remark-ppt:vim:v1', vimEnabled ? 'on' : 'off'); } catch { /* 本次会话仍保持设置 */ }
+  updateVimStatus();
+  editor.focus();
+});
+if (cliMode === 'preview' || cliMode === 'present') {
   editor.readOnly = true;
   const openButton = document.querySelector('#open-button');
   openButton.hidden = true;
@@ -122,8 +159,11 @@ const deck = new Reveal(document.querySelector('#deck'), {
   progress: false,
   slideNumber: false,
   hash: false,
-  keyboard: false,
-  overview: false,
+  keyboard: true,
+  plugins: [RevealNotes],
+  postMessageEvents: speakerOptions.postMessageEvents,
+  keyboardCondition: (event) => document.body.classList.contains('presenting') && !isTypingTarget(event.target),
+  overview: true,
   transition: 'fade',
   transitionSpeed: 'fast',
 });
@@ -149,8 +189,9 @@ function updateCounters() {
   const total = Math.max(1, ready ? deck.getTotalSlides() : slideContainer.children.length);
   const index = ready ? Math.min(deck.getIndices().h, total - 1) : 0;
   pageCount.textContent = formatPage(index, total);
-  prevButton.disabled = index <= 0;
-  nextButton.disabled = index >= total - 1;
+  const fragments = ready ? deck.availableFragments() : { prev: false, next: false };
+  prevButton.disabled = index <= 0 && !fragments.prev;
+  nextButton.disabled = index >= total - 1 && !fragments.next;
   const lines = editor.value.split('\n').length;
   editorCount.textContent = `${lines} 行 · ${editor.value.length} 字`;
 }
@@ -177,6 +218,7 @@ async function renderChart(pre, code, version) {
     host.append(canvas);
     const Chart = await getChart();
     if (version !== renderVersion || !host.isConnected) return;
+    const colors = themeColors();
     const palette = ['#5e81ac', '#88c0d0', '#a3be8c', '#b48ead', '#d08770', '#ebcb8b'];
     chartInstances.push(new Chart(canvas, {
       type: spec.type,
@@ -184,8 +226,8 @@ async function renderChart(pre, code, version) {
         labels: spec.labels,
         datasets: [{
           data: spec.values,
-          backgroundColor: spec.type === 'doughnut' ? spec.values.map((_, i) => palette[i % palette.length]) : '#5e81ac',
-          borderColor: '#5e81ac',
+          backgroundColor: spec.type === 'doughnut' ? spec.values.map((_, i) => palette[i % palette.length]) : colors.nord10,
+          borderColor: colors.nord10,
           borderWidth: spec.type === 'line' ? 4 : 0,
           pointRadius: 5,
           borderRadius: spec.type === 'bar' ? 6 : 0,
@@ -198,12 +240,12 @@ async function renderChart(pre, code, version) {
         animation: false,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: spec.type === 'doughnut', position: 'right', labels: { color: '#3b4252', font: { size: 18, family: 'Source Han Sans CN' } } },
-          title: { display: Boolean(spec.title), text: spec.title, color: '#2e3440', align: 'start', font: { size: 22, family: 'Source Han Sans CN', weight: 'bold' }, padding: { bottom: 18 } },
+          legend: { display: spec.type === 'doughnut', position: 'right', labels: { color: colors.nord0, font: { size: 18, family: 'Source Han Sans CN' } } },
+          title: { display: Boolean(spec.title), text: spec.title, color: colors.nord0, align: 'start', font: { size: 22, family: 'Source Han Sans CN', weight: 'bold' }, padding: { bottom: 18 } },
         },
         scales: spec.type === 'doughnut' ? {} : {
-          x: { ticks: { color: '#4c566a', font: { size: 17, family: 'Source Han Sans CN' } }, grid: { display: false }, border: { display: false } },
-          y: { beginAtZero: true, ticks: { color: '#4c566a', font: { size: 16 } }, grid: { color: '#d8dee9' }, border: { display: false } },
+          x: { ticks: { color: colors.nord3, font: { size: 17, family: 'Source Han Sans CN' } }, grid: { display: false }, border: { display: false } },
+          y: { beginAtZero: true, ticks: { color: colors.nord3, font: { size: 16 } }, grid: { color: colors.nord4 }, border: { display: false } },
         },
       },
     }));
@@ -213,6 +255,8 @@ async function renderChart(pre, code, version) {
 }
 
 async function renderVisuals(version) {
+  const colors = themeColors();
+  let mermaid;
   let diagramIndex = 0;
   for (const pre of slideContainer.querySelectorAll('pre')) {
     if (version !== renderVersion) return;
@@ -225,7 +269,23 @@ async function renderVisuals(version) {
       const source = code.textContent;
       pre.replaceWith(host);
       try {
-        const mermaid = await getMermaid();
+        mermaid ??= await getMermaid();
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: 'strict',
+          htmlLabels: false,
+          theme: 'base',
+          themeVariables: {
+            background: colors.nord6,
+            primaryColor: colors.nord5,
+            primaryTextColor: colors.nord0,
+            primaryBorderColor: colors.nord10,
+            lineColor: colors.nord10,
+            secondaryColor: colors.nord4,
+            tertiaryColor: colors.nord6,
+            fontFamily: 'Source Han Sans CN, sans-serif',
+          },
+        });
         const { svg } = await mermaid.render(`remark-diagram-${version}-${diagramIndex++}`, source);
         if (version !== renderVersion || !host.isConnected) return;
         host.innerHTML = DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } });
@@ -252,21 +312,28 @@ function renderSlides() {
     section.setAttribute('aria-label', `第 ${index + 1} 页`);
     const content = markdown || '# 空白页面\n\n在左侧写下内容。';
     try {
-      const structure = parseSlideStructure(content);
+      const { content: visibleContent, notes } = extractSpeakerNotes(content);
+      const structure = parseSlideStructure(visibleContent);
       section.classList.add(`layout-${structure.layout}`);
       if (structure.layout === 'split') {
-        section.innerHTML = DOMPurify.sanitize(marked.parse(structure.title));
+        section.innerHTML = DOMPurify.sanitize(renderSteppedMarkdown(structure.title));
         const grid = document.createElement('div');
         grid.className = 'split-grid';
         for (const column of structure.columns) {
           const panel = document.createElement('div');
           panel.className = 'split-column';
-          panel.innerHTML = DOMPurify.sanitize(marked.parse(column));
+          panel.innerHTML = DOMPurify.sanitize(renderSteppedMarkdown(column));
           grid.append(panel);
         }
         section.append(grid);
       } else {
-        section.innerHTML = DOMPurify.sanitize(marked.parse(structure.content));
+        section.innerHTML = DOMPurify.sanitize(renderSteppedMarkdown(structure.content));
+      }
+      if (notes) {
+        const aside = document.createElement('aside');
+        aside.className = 'notes';
+        aside.innerHTML = DOMPurify.sanitize(marked.parse(notes));
+        section.append(aside);
       }
     } catch (error) {
       section.textContent = `幻灯片格式错误：${error.message}`;
@@ -292,12 +359,16 @@ function renderSlides() {
     deck.sync();
     deck.slide(Math.min(currentIndex, pages.length - 1));
     deck.layout();
+    // 同一页的源文件内容更新也要通知演讲者窗口刷新备注。
+    deck.dispatchEvent({ type: 'slidechanged', data: {
+      indexh: deck.getIndices().h, indexv: deck.getIndices().v, currentSlide: deck.getCurrentSlide(),
+    } });
   }
   updateCounters();
 }
 
 function saveContent() {
-  if (cliMode === 'present') return;
+  if (cliMode === 'preview' || cliMode === 'present') return;
   try {
     localStorage.setItem(draftKey, editor.value);
     saveStatus.textContent = cliMode === 'import' ? '浏览器已保存' : '已保存';
@@ -315,6 +386,11 @@ editor.addEventListener('input', () => {
     saveContent();
   }, 120);
 });
+themeButton.addEventListener('click', () => {
+  applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+  try { localStorage.setItem(themeKey, currentTheme); } catch { /* 本次会话仍保持主题 */ }
+  renderSlides();
+});
 
 function enterPresent({ native = true } = {}) {
   document.body.classList.add('presenting');
@@ -324,13 +400,17 @@ function enterPresent({ native = true } = {}) {
 
 function exitPresent() {
   document.body.classList.remove('presenting');
+  deck.toggleOverview(false);
+  deck.togglePause(false);
+  deck.closeOverlay();
   if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
   requestAnimationFrame(() => deck.layout());
 }
 
 document.addEventListener('fullscreenchange', () => {
   if (!document.fullscreenElement && document.body.classList.contains('presenting')) {
-    document.body.classList.remove('presenting');
+    exitPresent();
+    return;
   }
   requestAnimationFrame(() => deck.layout());
 });
@@ -341,41 +421,42 @@ function isTypingTarget(target) {
 }
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && document.body.classList.contains('presenting')) {
-    event.preventDefault();
-    exitPresent();
-    return;
+  const action = getKeyboardAction({
+    key: event.key,
+    presenting: document.body.classList.contains('presenting'),
+    typing: isTypingTarget(event.target),
+    altKey: event.altKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+  });
+  if (!action || action === 'native') return;
+  if (action === 'exit' && (deck.isOverview() || deck.isOverlayOpen())) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (action === 'notes') {
+    if (!event.repeat && !isSpeakerReceiver) deck.getPlugin('notes').open();
   }
-  if (event.altKey || event.ctrlKey || event.metaKey || isTypingTarget(event.target)) return;
-  if (event.key.toLowerCase() === 'f') {
-    event.preventDefault();
-    enterPresent();
-  } else if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(event.key)) {
-    event.preventDefault();
-    deck.next();
-  } else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(event.key)) {
-    event.preventDefault();
-    deck.prev();
-  } else if (event.key === 'Home') {
-    event.preventDefault();
-    deck.slide(0);
-  } else if (event.key === 'End') {
-    event.preventDefault();
-    deck.slide(deck.getTotalSlides() - 1);
-  }
+  else if (action === 'show') enterPresent({ native: false });
+  else if (action === 'enter') enterPresent();
+  else if (action === 'exit') exitPresent();
+  else if (action === 'next') deck.next();
+  else if (action === 'prev') deck.prev();
+  else if (action === 'first') deck.slide(0);
+  else if (action === 'last') deck.slide(deck.getTotalSlides() - 1);
 });
 
-document.querySelector('#present-button').addEventListener('click', () => enterPresent());
+document.querySelector('#present-button').addEventListener('click', () => enterPresent({ native: false }));
 document.querySelector('#exit-button').addEventListener('click', exitPresent);
 document.querySelector('#open-button').addEventListener('click', () => fileInput.click());
 document.querySelector('#prev-button').addEventListener('click', () => deck.prev());
 document.querySelector('#next-button').addEventListener('click', () => deck.next());
 
 fileInput.addEventListener('change', async () => {
-  if (cliMode === 'present') return;
+  if (cliMode === 'preview' || cliMode === 'present') return;
   const file = fileInput.files?.[0];
   if (!file) return;
   editor.value = await file.text();
+  vim.reset();
   renderSlides();
   saveContent();
   fileInput.value = '';
@@ -393,15 +474,24 @@ document.querySelector('#download-button').addEventListener('click', () => {
 
 renderSlides();
 await deck.initialize();
+deck.removeKeyBinding(83);
+deck.addKeyBinding({ keyCode: 80, key: 'P', description: '演讲者视图' }, () => {
+  if (!isSpeakerReceiver) deck.getPlugin('notes').open();
+});
+if (isSpeakerReceiver) enterPresent({ native: false });
+deck.registerKeyboardShortcut('ESC, O', '退出放映 / 幻灯片总览');
 deck.on('slidechanged', updateCounters);
+deck.on('fragmentshown', updateCounters);
+deck.on('fragmenthidden', updateCounters);
 updateCounters();
 window.addEventListener('resize', () => deck.layout());
-if (cliMode === 'present') {
-  enterPresent({ native: false });
+if (cliMode === 'preview' || cliMode === 'present') {
+  if (cliMode === 'present') enterPresent({ native: false });
   const events = new EventSource(`/__events?token=${encodeURIComponent(cliToken)}`);
   events.addEventListener('change', async () => {
     try {
       editor.value = await loadCliDeck();
+      vim.reset();
       renderSlides();
       saveStatus.textContent = '已从文件更新';
     } catch {

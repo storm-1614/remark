@@ -19,10 +19,10 @@ const MIME = {
 
 export function parseCliArgs(args) {
   const [command, file, ...flags] = args;
-  if (!['import', 'present'].includes(command)) throw new Error('命令应为 import 或 present');
+  if (!['import', 'preview', 'present'].includes(command)) throw new Error('命令应为 import、preview 或 present');
   if (!file || file.startsWith('--')) throw new Error('请提供 Markdown 文件路径');
 
-  const options = { command, file, open: true, json: false, port: 0 };
+  const options = { command, file, open: true, json: false, port: 5175 };
   for (let i = 0; i < flags.length; i++) {
     const flag = flags[i];
     if (flag === '--no-open') options.open = false;
@@ -63,7 +63,7 @@ export async function createPreviewServer({ file, distDir, token, port = 0, watc
   const deckDir = await realpath(resolve(file, '..'));
   const clients = new Set();
   const onFileChange = (current, previous) => {
-    if (current.mtimeMs === previous.mtimeMs && current.size === previous.size) return;
+    if (current.mtimeMs === previous.mtimeMs && current.size === previous.size && current.ino === previous.ino) return;
     for (const client of clients) client.write('event: change\ndata: reload\n\n');
   };
 
