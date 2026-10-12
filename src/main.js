@@ -22,13 +22,16 @@ import { splitSlides } from './slides.js';
 import { parseChartSpec, parseSlideStructure } from './visuals.js';
 import { getKeyboardAction } from './keyboard.js';
 import { chooseTheme } from './theme.js';
+import { FONT_OPTIONS, chooseFont } from './fonts.js';
 import { createVimEditor } from './vim.js';
 import { colorExtension } from './colors.js';
+import { sizeExtension } from './sizes.js';
 import { mathExtension } from './math.js';
 import { renderSteppedMarkdown } from './steps.js';
 import { extractSpeakerNotes } from './notes.js';
-import { getSpeakerOptions } from './speaker.js';
+import { getSpeakerOptions, syncSpeakerAppearance } from './speaker.js';
 import { parseDeckMetadata } from './deck.js';
+import { presentationUrl } from './presentation.js';
 import 'reveal.js/reveal.css';
 import 'katex/dist/katex.min.css';
 import './style.css';
@@ -47,6 +50,9 @@ const presentBrand = document.querySelector('.present-brand');
 const cliParams = new URLSearchParams(location.search);
 const speakerOptions = getSpeakerOptions(cliParams);
 const isSpeakerReceiver = speakerOptions.receiver;
+const isPresentationWindow = cliParams.get('presentation') === '1' && !isSpeakerReceiver;
+let presentationWindow = null;
+let applyingPresentationUpdate = false;
 if (isSpeakerReceiver) document.body.classList.add('speaker-receiver');
 const cliMode = cliParams.get('cli') === '1' ? cliParams.get('mode') : null;
 const cliToken = cliParams.get('token');
@@ -54,6 +60,7 @@ const cliFileName = cliParams.get('name') || 'slides.md';
 const draftKey = cliMode === 'import' ? `${STORAGE_KEY}:import:${cliToken}` : STORAGE_KEY;
 const themeKey = 'remark-ppt:theme:v1';
 const themeButton = document.querySelector('#theme-button');
+let speakerAppearanceSync;
 let storedTheme;
 try { storedTheme = localStorage.getItem(themeKey); } catch { /* 私密模式仍可切换主题 */ }
 let currentTheme = chooseTheme(storedTheme, matchMedia('(prefers-color-scheme: dark)').matches);
@@ -63,11 +70,34 @@ function applyTheme(theme) {
   document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#2e3440' : '#eceff4';
   themeButton.textContent = theme === 'dark' ? '浅色' : '深色';
   themeButton.setAttribute('aria-label', `切换到${theme === 'dark' ? '浅色' : '深色'}主题`);
+  speakerAppearanceSync?.broadcast();
 }
 applyTheme(currentTheme);
 
+const fontKey = 'remark-ppt:font:v1';
+const fontSelect = document.querySelector('#font-select');
+for (const [value, option] of Object.entries(FONT_OPTIONS)) {
+  fontSelect.add(new Option(option.label, value));
+}
+let storedFont;
+try { storedFont = localStorage.getItem(fontKey); } catch { /* 禁用存储时使用默认字体 */ }
+let currentFont;
+let fontReady;
+function applyFont(value) {
+  currentFont = chooseFont(value);
+  const option = FONT_OPTIONS[currentFont];
+  fontSelect.value = currentFont;
+  document.documentElement.style.setProperty('--slide-font', option.family);
+  fontReady = option.load
+    ? document.fonts.load(`34px "${option.load}"`, '幻灯片 Aa').catch(() => [])
+    : Promise.resolve();
+  speakerAppearanceSync?.broadcast();
+}
+applyFont(storedFont);
+
 marked.setOptions({ gfm: true, breaks: false });
 marked.use(colorExtension);
+marked.use(sizeExtension);
 marked.use(mathExtension);
 let mermaidPromise;
 let chartPromise;
@@ -144,7 +174,7 @@ vimButton.addEventListener('click', () => {
   updateVimStatus();
   editor.focus();
 });
-if (cliMode === 'preview' || cliMode === 'present') {
+if (cliMode === 'preview' || cliMode === 'present' || isPresentationWindow) {
   editor.readOnly = true;
   const openButton = document.querySelector('#open-button');
   openButton.hidden = true;
@@ -242,12 +272,12 @@ async function renderChart(pre, code, version) {
         animation: false,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: spec.type === 'doughnut', position: 'right', labels: { color: colors.nord0, font: { size: 18, family: 'Source Han Sans CN' } } },
-          title: { display: Boolean(spec.title), text: spec.title, color: colors.nord0, align: 'start', font: { size: 22, family: 'Source Han Sans CN', weight: 'bold' }, padding: { bottom: 18 } },
+          legend: { display: spec.type === 'doughnut', position: 'right', labels: { color: colors.nord0, font: { size: 18, family: FONT_OPTIONS[currentFont].family } } },
+          title: { display: Boolean(spec.title), text: spec.title, color: colors.nord0, align: 'start', font: { size: 22, family: FONT_OPTIONS[currentFont].family, weight: 'bold' }, padding: { bottom: 18 } },
         },
         scales: spec.type === 'doughnut' ? {} : {
-          x: { ticks: { color: colors.nord3, font: { size: 17, family: 'Source Han Sans CN' } }, grid: { display: false }, border: { display: false } },
-          y: { beginAtZero: true, ticks: { color: colors.nord3, font: { size: 16 } }, grid: { color: colors.nord4 }, border: { display: false } },
+          x: { ticks: { color: colors.nord3, font: { size: 17, family: FONT_OPTIONS[currentFont].family } }, grid: { display: false }, border: { display: false } },
+          y: { beginAtZero: true, ticks: { color: colors.nord3, font: { size: 16, family: FONT_OPTIONS[currentFont].family } }, grid: { color: colors.nord4 }, border: { display: false } },
         },
       },
     }));
@@ -257,6 +287,8 @@ async function renderChart(pre, code, version) {
 }
 
 async function renderVisuals(version) {
+  await fontReady;
+  if (version !== renderVersion) return;
   const colors = themeColors();
   let mermaid;
   let diagramIndex = 0;
@@ -285,7 +317,7 @@ async function renderVisuals(version) {
             lineColor: colors.nord10,
             secondaryColor: colors.nord4,
             tertiaryColor: colors.nord6,
-            fontFamily: 'Source Han Sans CN, sans-serif',
+            fontFamily: FONT_OPTIONS[currentFont].family,
           },
         });
         const { svg } = await mermaid.render(`remark-diagram-${version}-${diagramIndex++}`, source);
@@ -370,6 +402,24 @@ function renderSlides() {
     } });
   }
   updateCounters();
+  if (deck.isReady()) sendPresentationUpdate();
+}
+
+function sendPresentationUpdate() {
+  if (applyingPresentationUpdate || isSpeakerReceiver || isPresentationWindow || !presentationWindow || presentationWindow.closed) return;
+  presentationWindow.postMessage({ namespace: 'remark-presentation', type: 'update',
+    content: editor.value, theme: currentTheme, font: currentFont, state: deck.getState() }, location.origin);
+}
+
+function openPresentation() {
+  if (isPresentationWindow || isSpeakerReceiver) { enterPresent(); return; }
+  if (presentationWindow && !presentationWindow.closed) {
+    sendPresentationUpdate();
+    presentationWindow.focus();
+    return;
+  }
+  presentationWindow = window.open(presentationUrl(location.href), 'remark-presentation', 'popup,width=1280,height=800');
+  if (!presentationWindow) saveStatus.textContent = '请允许弹窗以打开放映窗口';
 }
 
 function saveContent() {
@@ -396,6 +446,17 @@ themeButton.addEventListener('click', () => {
   try { localStorage.setItem(themeKey, currentTheme); } catch { /* 本次会话仍保持主题 */ }
   renderSlides();
 });
+fontSelect.addEventListener('change', () => {
+  applyFont(fontSelect.value);
+  try { localStorage.setItem(fontKey, currentFont); } catch { /* 本次会话仍保持字体 */ }
+  renderSlides();
+});
+window.addEventListener('storage', event => {
+  if (event.key === fontKey && chooseFont(event.newValue) !== currentFont) {
+    applyFont(event.newValue);
+    renderSlides();
+  }
+});
 
 function enterPresent({ native = true } = {}) {
   document.body.classList.add('presenting');
@@ -404,6 +465,7 @@ function enterPresent({ native = true } = {}) {
 }
 
 function exitPresent() {
+  if (isPresentationWindow) { window.close(); return; }
   document.body.classList.remove('presenting');
   deck.toggleOverview(false);
   deck.togglePause(false);
@@ -441,8 +503,7 @@ document.addEventListener('keydown', (event) => {
   if (action === 'notes') {
     if (!event.repeat && !isSpeakerReceiver) deck.getPlugin('notes').open();
   }
-  else if (action === 'show') enterPresent({ native: false });
-  else if (action === 'enter') enterPresent();
+  else if (action === 'show' || action === 'enter') openPresentation();
   else if (action === 'exit') exitPresent();
   else if (action === 'next') deck.next();
   else if (action === 'prev') deck.prev();
@@ -450,8 +511,9 @@ document.addEventListener('keydown', (event) => {
   else if (action === 'last') deck.slide(deck.getTotalSlides() - 1);
 });
 
-document.querySelector('#present-button').addEventListener('click', () => enterPresent({ native: false }));
+document.querySelector('#present-button').addEventListener('click', openPresentation);
 document.querySelector('#exit-button').addEventListener('click', exitPresent);
+document.querySelector('#fullscreen-button').addEventListener('click', () => enterPresent());
 document.querySelector('#open-button').addEventListener('click', () => fileInput.click());
 document.querySelector('#prev-button').addEventListener('click', () => deck.prev());
 document.querySelector('#next-button').addEventListener('click', () => deck.next());
@@ -479,15 +541,61 @@ document.querySelector('#download-button').addEventListener('click', () => {
 
 renderSlides();
 await deck.initialize();
+speakerAppearanceSync = syncSpeakerAppearance(window,
+  () => ({ font: currentFont, theme: currentTheme }),
+  appearance => {
+    const fontChanged = Object.hasOwn(FONT_OPTIONS, appearance.font) && appearance.font !== currentFont;
+    const themeChanged = ['light', 'dark'].includes(appearance.theme) && appearance.theme !== currentTheme;
+    if (fontChanged) applyFont(appearance.font);
+    if (themeChanged) applyTheme(appearance.theme);
+    if (fontChanged || themeChanged) renderSlides();
+  }, isSpeakerReceiver);
 deck.removeKeyBinding(83);
 deck.addKeyBinding({ keyCode: 80, key: 'P', description: '演讲者视图' }, () => {
   if (!isSpeakerReceiver) deck.getPlugin('notes').open();
 });
-if (isSpeakerReceiver) enterPresent({ native: false });
+if (isSpeakerReceiver || isPresentationWindow) enterPresent({ native: false });
+document.querySelector('#fullscreen-button').hidden = !isPresentationWindow;
 deck.registerKeyboardShortcut('ESC, O', '退出放映 / 幻灯片总览');
 deck.on('slidechanged', updateCounters);
 deck.on('fragmentshown', updateCounters);
 deck.on('fragmenthidden', updateCounters);
+for (const name of ['slidechanged', 'fragmentshown', 'fragmenthidden', 'paused', 'resumed']) {
+  deck.on(name, () => {
+    if (applyingPresentationUpdate || isSpeakerReceiver) return;
+    if (isPresentationWindow && window.opener && !window.opener.closed) {
+      window.opener.postMessage({ namespace: 'remark-presentation', type: 'state', state: deck.getState() }, location.origin);
+    } else sendPresentationUpdate();
+  });
+}
+window.addEventListener('message', event => {
+  if (event.origin !== location.origin || event.data?.namespace !== 'remark-presentation') return;
+  const message = event.data;
+  if (isPresentationWindow && event.source === window.opener && message.type === 'update' && typeof message.content === 'string') {
+    applyingPresentationUpdate = true;
+    try {
+      const themeChanged = (message.theme === 'light' || message.theme === 'dark') && message.theme !== currentTheme;
+      const fontChanged = typeof message.font === 'string' && chooseFont(message.font) !== currentFont;
+      if (editor.value !== message.content || themeChanged || fontChanged) {
+        editor.value = message.content;
+        vim.reset();
+        if (themeChanged) applyTheme(message.theme);
+        if (fontChanged) applyFont(message.font);
+        renderSlides();
+      }
+      deck.setState(message.state);
+    } finally { applyingPresentationUpdate = false; }
+  } else if (!isPresentationWindow && presentationWindow && event.source === presentationWindow) {
+    if (message.type === 'request') sendPresentationUpdate();
+    else if (message.type === 'state' && message.state && typeof message.state === 'object') {
+      applyingPresentationUpdate = true;
+      try { deck.setState(message.state); } finally { applyingPresentationUpdate = false; }
+    }
+  }
+});
+if (isPresentationWindow && window.opener) {
+  window.opener.postMessage({ namespace: 'remark-presentation', type: 'request' }, location.origin);
+}
 updateCounters();
 window.addEventListener('resize', () => deck.layout());
 if (cliMode === 'preview' || cliMode === 'present') {

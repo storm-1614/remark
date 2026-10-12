@@ -1,4 +1,12 @@
 @font-face {
+  font-family: "LXGW WenKai";
+  src: url("/fonts/lxgw-wenkai.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
   font-family: "Source Han Sans CN";
   src: url("/fonts/source-han-sans-cn.woff2") format("woff2");
   font-style: normal;
@@ -110,6 +118,10 @@ kbd { font-family: inherit; font-size: 11px; border: 1px solid currentColor; bor
 .editor-tip { display: flex; align-items: center; gap: 8px; color: var(--nord3); font-size: 12px; margin-top: 22px; line-height: 1.6; }
 .tip-spark { color: var(--nord10); font-size: 18px; }
 .preview-tools { display: flex; align-items: center; gap: 7px; }
+.preview-heading { flex-wrap: wrap; gap: 8px 16px; }
+.font-picker { display: inline-flex; align-items: center; gap: 6px; margin-right: 10px; }
+.font-picker select { font: inherit; color: var(--nord0); background: var(--nord6); border: 1px solid var(--nord4); border-radius: 5px; padding: 5px 7px; max-width: 160px; }
+.font-picker select:focus-visible { outline: 2px solid var(--nord10); outline-offset: 2px; }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--nord10); box-shadow: 0 0 0 3px #5e81ac20; }
 .preview-stage { position: relative; padding: 22px; background: var(--nord5); border: 1px solid var(--nord4); border-radius: 13px; box-shadow: inset 0 2px 8px #2e34400a; }
 .preview-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: var(--nord6); box-shadow: 0 12px 28px #2e344017, 0 2px 5px #2e344012; overflow: hidden; }
@@ -122,7 +134,7 @@ kbd { font-family: inherit; font-size: 11px; border: 1px solid currentColor; bor
 .present-toolbar { display: none; }
 
 /* 讲述页只设置一套稳定的文字层级，内容越少，留白越充分。 */
-.reveal { color: var(--nord0); background: var(--nord6); font-family: inherit; font-size: 34px; }
+.reveal { color: var(--nord0); background: var(--nord6); font-family: var(--slide-font, "JetBrainsMono Nerd Font", "Source Han Sans CN", sans-serif); font-size: 34px; }
 .reveal .slides { text-align: left; }
 .reveal aside.notes { display: none !important; }
 body.speaker-receiver .present-toolbar { display: none !important; }
@@ -133,6 +145,9 @@ body.speaker-receiver .present-toolbar { display: none !important; }
 .reveal h2 { font-size: 1.35em; line-height: 1.25; margin: 0 0 .6em; }
 .reveal h3 { font-size: .83em; line-height: 1.4; color: var(--nord10); margin: 0 0 .8em; font-weight: 650; }
 .reveal p { line-height: 1.58; margin: .5em 0; }
+.reveal .text-size > :first-child { margin-top: 0; }
+.reveal .text-size > :last-child { margin-bottom: 0; }
+.reveal .text-size { margin: .5em 0; }
 .reveal strong { color: var(--nord10); font-weight: 750; }
 .reveal .text-red, .reveal .text-red strong { color: var(--text-red); }
 .reveal .text-blue, .reveal .text-blue strong { color: var(--text-blue); }
@@ -210,7 +225,7 @@ body.speaker-receiver .present-toolbar { display: none !important; }
 body.presenting { overflow: hidden; }
 body.presenting .preview-stage { position: fixed; z-index: 20; inset: 0; width: 100vw; height: 100dvh; padding: 0; border: 0; border-radius: 0; background: var(--nord6); }
 body.presenting .preview-frame { width: 100%; height: 100%; aspect-ratio: auto; box-shadow: none; }
-body.presenting .present-toolbar { display: flex; position: absolute; right: 26px; bottom: 49px; justify-content: flex-end; align-items: center; color: var(--nord3); opacity: 0; transition: opacity .2s; pointer-events: none; }
+body.presenting .present-toolbar { display: flex; position: absolute; right: 26px; bottom: 49px; gap: 10px; justify-content: flex-end; align-items: center; color: var(--nord3); opacity: 0; transition: opacity .2s; pointer-events: none; }
 body.presenting .preview-stage:hover .present-toolbar, body.presenting .present-toolbar:focus-within { opacity: 1; pointer-events: auto; }
 .present-brand, .present-credit { position: absolute; z-index: 3; bottom: 10px; color: var(--nord3); font-size: 10px; font-weight: 750; letter-spacing: -.05em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
 .present-brand { left: 14px; max-width: calc(100% - 100px); }
